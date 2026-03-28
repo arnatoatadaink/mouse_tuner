@@ -99,20 +99,21 @@ def get_smooth_curve() -> tuple[list[float], list[float]]:
         return list(SMOOTH_X_DEFAULT), list(SMOOTH_Y_DEFAULT)
 
 def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = True) -> None:
-    """Registry に書き込み、WM_SETTINGCHANGE をブロードキャストして即時反映。"""
-    xb = b"".join(_fixed64_encode(v) for v in xs)
-    yb = b"".join(_fixed64_encode(v) for v in ys)
-    with winreg.OpenKey(
-        winreg.HKEY_CURRENT_USER, MOUSE_REG_KEY,
-        access=winreg.KEY_SET_VALUE,
-    ) as k:
-        winreg.SetValueEx(k, "SmoothMouseXCurve", 0, winreg.REG_BINARY, xb)
-        winreg.SetValueEx(k, "SmoothMouseYCurve", 0, winreg.REG_BINARY, yb)
-    # 即時反映: 現在の SPI_SETMOUSE 値を SPIF_SENDCHANGE 付きで再送
+    """Registry に書き込み（persist=True 時のみ）、WM_SETTINGCHANGE をブロードキャストして即時反映。"""
+    if persist:
+        xb = b"".join(_fixed64_encode(v) for v in xs)
+        yb = b"".join(_fixed64_encode(v) for v in ys)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, MOUSE_REG_KEY,
+            access=winreg.KEY_SET_VALUE,
+        ) as k:
+            winreg.SetValueEx(k, "SmoothMouseXCurve", 0, winreg.REG_BINARY, xb)
+            winreg.SetValueEx(k, "SmoothMouseYCurve", 0, winreg.REG_BINARY, yb)
+    # 即時反映: 現在の SPI_SETMOUSE 値を SPIF_SENDCHANGE 付きで再送 (Registry には書かない)
     p = (ctypes.c_int * 3)()
     user32.SystemParametersInfoW(SPI_GETMOUSE, 0, p, 0)
     user32.SystemParametersInfoW(
-        SPI_SETMOUSE, 0, p, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
+        SPI_SETMOUSE, 0, p, SPIF_SENDCHANGE
     )
 
 # ═══════════════════════════════════════════════════════════════════
@@ -496,7 +497,7 @@ class MouseTuner(tk.Tk):
     def _on_curve(self) -> None:
         self._canvas.redraw()
         ys = [self._y_vars[i].get() for i in range(5)]
-        set_smooth_curve(self._curve_xs, ys)
+        set_smooth_curve(self._curve_xs, ys, persist=False)
         self.status.set(
             f"カーブ更新: [{', '.join(f'{v:.2f}' for v in ys)}]  (即時反映)"
         )
