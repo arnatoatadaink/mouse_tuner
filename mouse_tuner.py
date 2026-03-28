@@ -264,6 +264,7 @@ class MouseTuner(tk.Tk):
 
         self._build_ui()
         self._load_all()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ─── UI 構築 ─────────────────────────────────────────────────
 
@@ -547,6 +548,9 @@ class MouseTuner(tk.Tk):
         set_smooth_curve(self._curve_xs, ys)
         self._canvas.redraw()
         self.status.set("↩ 起動時の設定に戻しました")
+
+    def _on_close(self) -> None:
+        self.destroy()
 
     @staticmethod
     def _is_float(s: str) -> bool:
