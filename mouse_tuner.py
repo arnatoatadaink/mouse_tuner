@@ -98,23 +98,24 @@ def get_smooth_curve() -> tuple[list[float], list[float]]:
     except Exception:
         return list(SMOOTH_X_DEFAULT), list(SMOOTH_Y_DEFAULT)
 
-def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = True) -> None:
-    """Registry に書き込み（persist=True 時のみ）、WM_SETTINGCHANGE をブロードキャストして即時反映。"""
-    if persist:
-        xb = b"".join(_fixed64_encode(v) for v in xs)
-        yb = b"".join(_fixed64_encode(v) for v in ys)
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, MOUSE_REG_KEY,
-            access=winreg.KEY_SET_VALUE,
-        ) as k:
-            winreg.SetValueEx(k, "SmoothMouseXCurve", 0, winreg.REG_BINARY, xb)
-            winreg.SetValueEx(k, "SmoothMouseYCurve", 0, winreg.REG_BINARY, yb)
-    # 即時反映: 現在の SPI_SETMOUSE 値を SPIF_SENDCHANGE 付きで再送 (Registry には書かない)
+def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = False) -> None:
+    """SmoothMouseCurve を Registry に書き込んで即時反映。
+    SmoothMouseCurve は Registry 経由でしか反映できないため常に書き込む。
+    persist=True のとき SPI_SETMOUSE も SPIF_UPDATEINIFILE 付きで呼び出し
+    閾値・速度も永続化する。"""
+    xb = b"".join(_fixed64_encode(v) for v in xs)
+    yb = b"".join(_fixed64_encode(v) for v in ys)
+    with winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER, MOUSE_REG_KEY,
+        access=winreg.KEY_SET_VALUE,
+    ) as k:
+        winreg.SetValueEx(k, "SmoothMouseXCurve", 0, winreg.REG_BINARY, xb)
+        winreg.SetValueEx(k, "SmoothMouseYCurve", 0, winreg.REG_BINARY, yb)
+    # 即時反映: 現在の SPI_SETMOUSE 値を再送して WM_SETTINGCHANGE をブロードキャスト
+    f = (SPIF_UPDATEINIFILE | SPIF_SENDCHANGE) if persist else SPIF_SENDCHANGE
     p = (ctypes.c_int * 3)()
     user32.SystemParametersInfoW(SPI_GETMOUSE, 0, p, 0)
-    user32.SystemParametersInfoW(
-        SPI_SETMOUSE, 0, p, SPIF_SENDCHANGE
-    )
+    user32.SystemParametersInfoW(SPI_SETMOUSE, 0, p, f)
 
 # ═══════════════════════════════════════════════════════════════════
 #  テーマ定数
