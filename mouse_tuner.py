@@ -83,8 +83,14 @@ def _fixed64_encode(v: float) -> bytes:
 #  スムーズカーブ
 # ───────────────────────────────────────────────────────────────────
 
-SMOOTH_X_DEFAULT = [0.0, 15.0, 31.0, 46.0, 61.0]   # 入力速度 (mickey/tick)
-SMOOTH_Y_DEFAULT = [0.0, 0.75, 1.5,  2.25, 3.0  ]   # 出力倍率
+SMOOTH_X_DEFAULT = [0.0, 108.0, 216.0, 324.0, 400.0]  # 入力速度 (mickey/tick) Windows既定
+SMOOTH_Y_DEFAULT = [0.0, 0.75,  1.5,   2.25,  3.0  ]  # 出力倍率
+
+# Windows 既定値 (修復用)
+WIN_DEFAULT_SPEED = 10
+WIN_DEFAULT_T1    = 6
+WIN_DEFAULT_T2    = 10
+WIN_DEFAULT_ACCEL = 1
 
 def get_smooth_curve() -> tuple[list[float], list[float]]:
     """Registry から (x_points[5], y_points[5]) を返す。キーがなければデフォルト。"""
@@ -310,9 +316,10 @@ class MouseTuner(tk.Tk):
         # 共通ボタン行
         brow = tk.Frame(self, bg=BG, pady=10)
         brow.pack(fill="x", padx=24)
-        self._btn(brow, "↩  元に戻す", self._revert, MUTED   ).pack(side="left")
-        self._btn(brow, "💾  永続保存", self._persist, "#4da6ff").pack(side="right")
-        self._btn(brow, "✓  即時適用", self._apply,   ACCENT  ).pack(side="right", padx=(0, 8))
+        self._btn(brow, "↩  元に戻す",      self._revert,           MUTED     ).pack(side="left")
+        self._btn(brow, "🔧  Windows既定値", self._reset_windows_defaults, "#ff9944").pack(side="left", padx=(8, 0))
+        self._btn(brow, "💾  永続保存",      self._persist,          "#4da6ff"  ).pack(side="right")
+        self._btn(brow, "✓  即時適用",       self._apply,            ACCENT    ).pack(side="right", padx=(0, 8))
 
     # ── タブ1: 基本設定 ──────────────────────────────────────────
 
@@ -550,6 +557,25 @@ class MouseTuner(tk.Tk):
         set_smooth_curve(self._curve_xs, ys)
         self._canvas.redraw()
         self.status.set("↩ 起動時の設定に戻しました")
+
+    def _reset_windows_defaults(self) -> None:
+        """全設定を Windows 既定値に戻し Registry に永続化する（破損修復用）。"""
+        # UI
+        self.speed_var.set(WIN_DEFAULT_SPEED)
+        self.speed_lbl.set(str(WIN_DEFAULT_SPEED))
+        self.accel_var.set(WIN_DEFAULT_ACCEL)
+        self.t1_var.set(WIN_DEFAULT_T1)
+        self.t2_var.set(WIN_DEFAULT_T2)
+        self._curve_xs = list(SMOOTH_X_DEFAULT)
+        self._canvas._xs = self._curve_xs
+        for i, v in enumerate(SMOOTH_Y_DEFAULT):
+            self._y_vars[i].set(v)
+        self._canvas.redraw()
+        # API + Registry
+        set_mouse_speed(WIN_DEFAULT_SPEED, persist=True)
+        set_mouse_params(WIN_DEFAULT_T1, WIN_DEFAULT_T2, WIN_DEFAULT_ACCEL, persist=True)
+        set_smooth_curve(list(SMOOTH_X_DEFAULT), list(SMOOTH_Y_DEFAULT), persist=True)
+        self.status.set("🔧 Windows 既定値にリセットしました（Registry 保存済み）")
 
     def _on_close(self) -> None:
         self.destroy()
