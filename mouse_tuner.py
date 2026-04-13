@@ -98,8 +98,11 @@ def get_smooth_curve() -> tuple[list[float], list[float]]:
     except Exception:
         return list(SMOOTH_X_DEFAULT), list(SMOOTH_Y_DEFAULT)
 
-def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = True) -> None:
-    """Registry に書き込み、WM_SETTINGCHANGE をブロードキャストして即時反映。"""
+def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = False) -> None:
+    """SmoothMouseCurve を Registry に書き込んで即時反映。
+    SmoothMouseCurve は Registry 経由でしか反映できないため常に書き込む。
+    persist=True のとき SPI_SETMOUSE も SPIF_UPDATEINIFILE 付きで呼び出し
+    閾値・速度も永続化する。"""
     xb = b"".join(_fixed64_encode(v) for v in xs)
     yb = b"".join(_fixed64_encode(v) for v in ys)
     with winreg.OpenKey(
@@ -108,12 +111,11 @@ def set_smooth_curve(xs: list[float], ys: list[float], persist: bool = True) -> 
     ) as k:
         winreg.SetValueEx(k, "SmoothMouseXCurve", 0, winreg.REG_BINARY, xb)
         winreg.SetValueEx(k, "SmoothMouseYCurve", 0, winreg.REG_BINARY, yb)
-    # 即時反映: 現在の SPI_SETMOUSE 値を SPIF_SENDCHANGE 付きで再送
+    # 即時反映: 現在の SPI_SETMOUSE 値を再送して WM_SETTINGCHANGE をブロードキャスト
+    f = (SPIF_UPDATEINIFILE | SPIF_SENDCHANGE) if persist else SPIF_SENDCHANGE
     p = (ctypes.c_int * 3)()
     user32.SystemParametersInfoW(SPI_GETMOUSE, 0, p, 0)
-    user32.SystemParametersInfoW(
-        SPI_SETMOUSE, 0, p, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
-    )
+    user32.SystemParametersInfoW(SPI_SETMOUSE, 0, p, f)
 
 # ═══════════════════════════════════════════════════════════════════
 #  テーマ定数
@@ -264,6 +266,7 @@ class MouseTuner(tk.Tk):
 
         self._build_ui()
         self._load_all()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ─── UI 構築 ─────────────────────────────────────────────────
 
@@ -495,7 +498,7 @@ class MouseTuner(tk.Tk):
     def _on_curve(self) -> None:
         self._canvas.redraw()
         ys = [self._y_vars[i].get() for i in range(5)]
-        set_smooth_curve(self._curve_xs, ys)
+        set_smooth_curve(self._curve_xs, ys, persist=False)
         self.status.set(
             f"カーブ更新: [{', '.join(f'{v:.2f}' for v in ys)}]  (即時反映)"
         )
@@ -547,6 +550,9 @@ class MouseTuner(tk.Tk):
         set_smooth_curve(self._curve_xs, ys)
         self._canvas.redraw()
         self.status.set("↩ 起動時の設定に戻しました")
+
+    def _on_close(self) -> None:
+        self.destroy()
 
     @staticmethod
     def _is_float(s: str) -> bool:
