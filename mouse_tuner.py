@@ -83,8 +83,8 @@ def _fixed64_encode(v: float) -> bytes:
 #  スムーズカーブ
 # ───────────────────────────────────────────────────────────────────
 
-SMOOTH_X_DEFAULT = [0.0, 15.0, 31.0, 46.0, 61.0]   # 入力速度 (mickey/tick)
-SMOOTH_Y_DEFAULT = [0.0, 0.75, 1.5,  2.25, 3.0  ]   # 出力倍率
+SMOOTH_X_DEFAULT = [0.0, 108.0, 216.0, 324.0, 400.0]  # 入力速度 (mickey/tick) Windows既定
+SMOOTH_Y_DEFAULT = [0.0, 0.75,  1.5,   2.25,  3.0  ]  # 出力倍率
 
 # Windows 既定値 (修復用)
 WIN_DEFAULT_SPEED = 10
